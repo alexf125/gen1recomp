@@ -1,5 +1,5 @@
 #!/bin/sh
-# Updated scripts/import-assets.sh to run species parser
+# Updated scripts/import-assets.sh to call map_species_fields.py
 set -euo pipefail
 PE_ROOT=${1:-.}
 BUILD_DIR=build
@@ -7,6 +7,7 @@ PREP_DIR="$BUILD_DIR/preprocessed"
 PREP_ALL="$BUILD_DIR/preprocessed_all.i"
 SYMBOLS_OUT="$BUILD_DIR/symbols.json"
 SPECIES_OUT="$BUILD_DIR/species.json"
+SPECIES_MAPPED_OUT="$BUILD_DIR/species_mapped.json"
 ASSETS_OUT="$BUILD_DIR/assets"
 
 mkdir -p "$BUILD_DIR" "$PREP_DIR" "$ASSETS_OUT"
@@ -30,6 +31,10 @@ python3 tools/extract_symbols.py --inputs "$PREP_ALL" --output "$SYMBOLS_OUT"
 # Parse species info
 echo "Parsing species table..."
 python3 tools/parse_species.py --input "$SYMBOLS_OUT" --output "$SPECIES_OUT"
+
+# Map species fields to structured schema
+echo "Mapping species fields to structured JSON..."
+python3 tools/map_species_fields.py --input "$SPECIES_OUT" --output "$SPECIES_MAPPED_OUT"
 
 # Export graphics/audio using pokeemerald data layout
 echo "Exporting graphics/audio..."
@@ -70,4 +75,4 @@ cat >> "$MAP_OUT" <<EOF
 }
 EOF
 
-echo "Import pipeline finished. Outputs: $SYMBOLS_OUT, $SPECIES_OUT, $ASSETS_OUT, $MAP_OUT"
+echo "Import pipeline finished. Outputs: $SYMBOLS_OUT, $SPECIES_OUT, $SPECIES_MAPPED_OUT, $ASSETS_OUT, $MAP_OUT"
