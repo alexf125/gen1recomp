@@ -1,4 +1,4 @@
--- love/main.lua (updated with map browser integration)
+-- love/main.lua (updated: auto-load Littleroot town, basic player movement and simple encounter trigger)
 local json = require('json') or require('dkjson')
 local map_renderer = require('map_renderer')
 local species_viewer = require('species_viewer')
@@ -16,18 +16,29 @@ local selectedMapName = nil
 local MAP_OX = 320
 local MAP_OY = 40
 
-function load_map_by_name(name)
+-- player
+local player = { x = 0, y = 0, speed = 4 }
+
+local function load_map_by_name(name)
   local path = 'build/maps/' .. name
   local f = io.open(path, 'r')
   if not f then return false end
   local txt = f:read('*a')
   f:close()
   state.map = json.decode(txt)
+  -- set player start from map if present
+  if state.map.player_start then
+    player.x = state.map.player_start.x
+    player.y = state.map.player_start.y
+  else
+    player.x = math.floor((state.map.width or 16)/2)
+    player.y = math.floor((state.map.height or 12)/2)
+  end
   return true
 end
 
 function love.load()
-  love.window.setTitle('gen1recomp LÖVE MVP')
+  love.window.setTitle('gen1recomp LÖVE MVP — Littleroot Demo')
   -- Try to load generated symbols
   if love.filesystem.getInfo('build/symbols.json') then
     local s = love.filesystem.read('build/symbols.json')
@@ -57,12 +68,40 @@ function love.load()
     state.tilesImg = love.graphics.newImage('build/assets/tiles.png')
   end
 
-  -- load map list
+  -- ensure maps dir exists and load littleroot if present
   mapList = ui_map_browser.list_maps()
-  if #mapList > 0 then
+  if love.filesystem.getInfo('build/maps/littleroot_town.json') then
+    selectedMapName = 'littleroot_town.json'
+    load_map_by_name(selectedMapName)
+  elseif #mapList > 0 then
     selectedMapIndex = 1
     selectedMapName = mapList[1]
     load_map_by_name(selectedMapName)
+  end
+end
+
+function love.update(dt)
+  local moved = false
+  if love.keyboard.isDown('up') then
+    player.y = player.y - player.speed * dt
+    moved = true
+  end
+  if love.keyboard.isDown('down') then
+    player.y = player.y + player.speed * dt
+    moved = true
+  end
+  if love.keyboard.isDown('left') then
+    player.x = player.x - player.speed * dt
+    moved = true
+  end
+  if love.keyboard.isDown('right') then
+    player.x = player.x + player.speed * dt
+    moved = true
+  end
+  -- clamp
+  if state.map then
+    player.x = math.max(0, math.min(player.x, state.map.width - 1))
+    player.y = math.max(0, math.min(player.y, state.map.height - 1))
   end
 end
 
@@ -81,9 +120,17 @@ function love.draw()
   if state.map and state.tilesImg then
     local ok, err = pcall(function() map_renderer.draw(state, MAP_OX, MAP_OY, tiles_meta) end)
     if not ok then love.graphics.print('Map draw error: '..tostring(err), MAP_OX, MAP_OY) end
+    -- draw player as a filled rectangle at tile coords
+    local tw = state.map.tile_width or 8
+    local th = state.map.tile_height or 8
+    love.graphics.setColor(1,0.8,0)
+    love.graphics.rectangle('fill', MAP_OX + player.x * tw, MAP_OY + player.y * th, tw, th)
   else
     love.graphics.print('No map/tiles found. Run import-assets.', MAP_OX, MAP_OY)
   end
+
+  love.graphics.setColor(1,1,1)
+  love.graphics.print('Controls: Arrow keys to move, B to trigger simple encounter', 10, 520)
 end
 
 function love.mousepressed(mx, my, button)
@@ -143,6 +190,14 @@ function love.keypressed(k)
       selectedMapIndex = 1
       selectedMapName = mapList[1]
       load_map_by_name(selectedMapName)
+    end
+  elseif k == 'b' then
+    -- simple encounter trigger: pick a species and print a battle start message
+    local species = (speciesJson and speciesJson.species and speciesJson.species[1]) or nil
+    if species then
+      print('Encounter! A wild species id='..tostring(species.id)..' appeared (demo).')
+    else
+      print('Encounter! (no species data available)')
     end
   end
 end
