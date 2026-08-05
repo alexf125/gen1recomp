@@ -1,9 +1,11 @@
--- love/main.lua (improved)
+-- love/main.lua (updated to load species.json viewer)
 local json = require('json') or require('dkjson')
 local map_renderer = require('map_renderer')
+local species_viewer = require('species_viewer')
 
 local assets = {}
 local state = {}
+local speciesJson = nil
 
 function love.load()
   love.window.setTitle('gen1recomp LÖVE MVP')
@@ -14,6 +16,12 @@ function love.load()
     assets = obj.gen1recomp or {}
   else
     assets = { symbols = {} }
+  end
+
+  -- load species
+  if love.filesystem.getInfo('build/species.json') then
+    local s = love.filesystem.read('build/species.json')
+    speciesJson = json.decode(s)
   end
 
   -- load map
@@ -34,6 +42,7 @@ function love.draw()
   love.graphics.clear(0.1, 0.1, 0.12)
   love.graphics.setColor(1,1,1)
   love.graphics.print('Loaded symbols: '..(#(assets.symbols or {})), 10, 10)
+  species_viewer.draw(speciesJson, 300, 10)
   if state.map and state.tilesImg then
     local ok, err = pcall(function() map_renderer.draw(state, 10, 40) end)
     if not ok then love.graphics.print('Map draw error: '..tostring(err), 10, 40) end
@@ -50,6 +59,12 @@ function love.keypressed(k)
       local obj = json.decode(s)
       assets = obj.gen1recomp or {}
       print('Reloaded symbols.json')
+    end
+    -- reload species
+    if love.filesystem.getInfo('build/species.json') then
+      local s = love.filesystem.read('build/species.json')
+      speciesJson = json.decode(s)
+      print('Reloaded species.json')
     end
     -- reload tiles
     if love.filesystem.getInfo('build/assets/tiles.png') then
