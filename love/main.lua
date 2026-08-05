@@ -1,4 +1,4 @@
--- love/main.lua (updated: pass move and use species base_hp for HP when starting battle)
+-- love/main.lua (updated: choose wild from encounter_table or named starters [Mudkip,Treecko,Torchic])
 local json = require('json') or require('dkjson')
 local map_renderer = require('map_renderer')
 local species_viewer = require('species_viewer')
@@ -24,6 +24,8 @@ local playerSprite = nil
 
 local encounter = nil
 local inEncounter = false
+
+local starters_preferred = { 'mudkip', 'treecko', 'torchic', 'treek' }
 
 local function load_player_sprite()
   if love.filesystem.getInfo('build/assets/player.png') then
@@ -54,16 +56,58 @@ local function try_move(dx, dy)
   return true
 end
 
+local function find_species_by_name(name)
+  if not speciesJson or not speciesJson.species then return nil end
+  local target = name:lower()
+  for _,s in ipairs(speciesJson.species) do
+    for k,v in pairs(s) do
+      if type(v) == 'string' and v:lower() == target then
+        return s
+      end
+    end
+  end
+  return nil
+end
+
+local function choose_wild_for_map(map)
+  -- try map-specific encounter_table
+  if map and map.encounter_table and #map.encounter_table > 0 then
+    -- build weighted list
+    local pool = {}
+    for _,entry in ipairs(map.encounter_table) do
+      local w = tonumber(entry.weight) or 1
+      local name = entry.name or entry.species
+      if name then
+        for i=1,w do table.insert(pool, name) end
+      end
+    end
+    if #pool > 0 then
+      local pick = pool[math.random(1, #pool)]
+      -- try to find mapped species
+      local spec = find_species_by_name(pick)
+      if spec then return spec end
+    end
+  end
+  -- fallback: prefer user-specified starters if present in species data
+  for _,nm in ipairs(starters_preferred) do
+    local s = find_species_by_name(nm)
+    if s then return s end
+  end
+  -- final fallback: first species entry
+  if speciesJson and speciesJson.species and #speciesJson.species > 0 then
+    return speciesJson.species[1]
+  end
+  return nil
+end
+
 local function check_for_encounter()
   if not state.map then return nil end
   local enc = state.map.encounter_tiles
   if not enc then return nil end
   for _,e in ipairs(enc) do
     if e.x == player.x and e.y == player.y then
-      -- pick first species as demo (or nil)
-      if speciesJson and speciesJson.species and #speciesJson.species > 0 then
-        return speciesJson.species[1]
-      end
+      local spec = choose_wild_for_map(state.map)
+      if spec then return spec end
       return { id = 0 }
     end
   end
