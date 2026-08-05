@@ -1,13 +1,15 @@
--- love/main.lua (updated: encounter spawning on move and a simple encounter UI)
+-- love/main.lua (battle integrated, moved into active main)
 local json = require('json') or require('dkjson')
 local map_renderer = require('map_renderer')
 local species_viewer = require('species_viewer')
 local ui_map_browser = require('ui_map_browser')
+local battle = require('battle')
 
 local assets = {}
 local state = {}
 local speciesJson = nil
 local tiles_meta = nil
+local movesJson = nil
 
 local mapList = {}
 local selectedMapIndex = 1
@@ -119,6 +121,12 @@ function love.load()
     speciesJson = json.decode(s)
   end
 
+  -- load moves
+  if love.filesystem.getInfo('build/moves.json') then
+    local s = love.filesystem.read('build/moves.json')
+    movesJson = json.decode(s)
+  end
+
   -- load tiles meta if present
   if love.filesystem.getInfo('build/assets/tiles_meta.json') then
     local s = love.filesystem.read('build/assets/tiles_meta.json')
@@ -146,7 +154,9 @@ function love.load()
 end
 
 function love.update(dt)
-  -- no continuous movement; movement handled on keypress for tile-step
+  if battle.active() then
+    battle.update(dt)
+  end
 end
 
 function love.draw()
@@ -161,7 +171,7 @@ function love.draw()
   ui_map_browser.draw_list(mapList, 10, 260, selectedMapIndex)
 
   -- draw selected map
-  if state.map and state.tilesImg then
+  if state.map and state.tilesImg and not battle.active() then
     local ok, err = pcall(function() map_renderer.draw(state, MAP_OX, MAP_OY, tiles_meta) end)
     if not ok then love.graphics.print('Map draw error: '..tostring(err), MAP_OX, MAP_OY) end
     -- draw player sprite at tile coords
@@ -173,17 +183,21 @@ function love.draw()
       love.graphics.setColor(1,0.8,0)
       love.graphics.rectangle('fill', MAP_OX + player.x * tw, MAP_OY + player.y * th, tw, th)
     end
-  else
+  elseif not battle.active() then
     love.graphics.print('No map/tiles found. Run import-assets.', MAP_OX, MAP_OY)
   end
 
-  if inEncounter and encounter then
+  if inEncounter and encounter and not battle.active() then
     -- draw a simple encounter panel
     love.graphics.setColor(0,0,0,0.8)
     love.graphics.rectangle('fill', 100, 100, 400, 160)
     love.graphics.setColor(1,1,1)
     love.graphics.printf('A wild species id='..tostring(encounter.id)..' appeared!', 110, 120, 380)
     love.graphics.printf('Press ENTER to start battle (demo) or ESC to run', 110, 160, 380)
+  end
+
+  if battle.active() then
+    battle.draw()
   end
 
   love.graphics.setColor(1,1,1)
@@ -211,11 +225,18 @@ function love.mousepressed(mx, my, button)
 end
 
 function love.keypressed(k)
+  if battle.active() then
+    battle.handle_key(k)
+    return
+  end
+
   if inEncounter then
     if k == 'return' or k == 'kpenter' then
       print('Starting battle (demo) with species id='..tostring(encounter.id))
-      -- placeholder: end encounter immediately
-      end_encounter()
+      -- start the battle with simple HP values
+      local wild = { id = encounter.id, hp = 40, maxhp = 40 }
+      local ply = { hp = 60, maxhp = 60 }
+      battle.start({ player = ply, wild = wild })
       return
     elseif k == 'escape' then
       print('You ran away (demo)')
@@ -242,6 +263,12 @@ function love.keypressed(k)
       local s = love.filesystem.read('build/species.json')
       speciesJson = json.decode(s)
       print('Reloaded species.json')
+    end
+    -- reload moves
+    if love.filesystem.getInfo('build/moves.json') then
+      local s = love.filesystem.read('build/moves.json')
+      movesJson = json.decode(s)
+      print('Reloaded moves.json')
     end
     -- reload tiles
     if love.filesystem.getInfo('build/assets/tiles.png') then

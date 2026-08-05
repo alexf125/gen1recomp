@@ -1,5 +1,8 @@
 #!/bin/sh
-# Updated import script: also generate player sprite placeholder
+# import-assets.sh - full import pipeline
+# Preprocess headers, extract symbols, parse species, map species using schema,
+# extract moves (or generate placeholder), convert graphics/cries, generate player sprite,
+# convert maps (fallback to sample), and produce build outputs for the LÖVE preview.
 set -euo pipefail
 PE_ROOT=${1:-.}
 BUILD_DIR=build
@@ -8,6 +11,7 @@ PREP_ALL="$BUILD_DIR/preprocessed_all.i"
 SYMBOLS_OUT="$BUILD_DIR/symbols.json"
 SPECIES_OUT="$BUILD_DIR/species.json"
 SPECIES_MAPPED_OUT="$BUILD_DIR/species_mapped.json"
+MOVES_OUT="$BUILD_DIR/moves.json"
 ASSETS_OUT="$BUILD_DIR/assets"
 CRIES_OUT="$ASSETS_OUT/cries"
 
@@ -41,6 +45,14 @@ if [ -f "$SCHEMA" ]; then
 else
   echo "Schema $SCHEMA not found; falling back to previous mapper"
   python3 tools/map_species_fields.py --input "$SPECIES_OUT" --output "$SPECIES_MAPPED_OUT"
+fi
+
+# Extract moves (heuristic) and fallback to placeholder if extraction fails
+echo "Extracting moves..."
+python3 tools/parse_moves.py --symbols "$SYMBOLS_OUT" --out "$MOVES_OUT" || true
+if [ ! -f "$MOVES_OUT" ] || [ ! -s "$MOVES_OUT" ]; then
+  echo "No moves extracted; generating placeholder moves.json"
+  python3 tools/generate_moves_placeholder.py "$MOVES_OUT"
 fi
 
 # Export graphics/audio using pokeemerald data layout
@@ -104,4 +116,4 @@ else
   echo "Maps found in build/maps/; using those for preview."
 fi
 
-echo "Import pipeline finished. Outputs: $SYMBOLS_OUT, $SPECIES_OUT, $SPECIES_MAPPED_OUT, $ASSETS_OUT, $BUILD_DIR/maps"
+echo "Import pipeline finished. Outputs: $SYMBOLS_OUT, $SPECIES_OUT, $SPECIES_MAPPED_OUT, $MOVES_OUT, $ASSETS_OUT, $BUILD_DIR/maps"
