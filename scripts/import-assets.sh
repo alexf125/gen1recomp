@@ -1,6 +1,5 @@
 #!/bin/sh
-# Updated import pipeline: preprocess headers, extract symbols, parse species using schema,
-# convert graphics/cries, convert maps. Overwrites previous import script.
+# Updated import script: also generate player sprite placeholder
 set -euo pipefail
 PE_ROOT=${1:-.}
 BUILD_DIR=build
@@ -55,6 +54,12 @@ python3 tools/convert_cries.py --symbols "$SYMBOLS_OUT" --out "$CRIES_OUT"
 if [ ! -f "$ASSETS_OUT/tiles.png" ]; then
   echo "No converted tiles found -- generating sample tiles"
   python3 tools/generate_sample_tiles.py "$ASSETS_OUT"
+fi
+
+# Generate a placeholder player sprite if missing
+if [ ! -f "$ASSETS_OUT/player.png" ]; then
+  echo "Generating placeholder player sprite..."
+  python3 tools/generate_player_sprite.py "$ASSETS_OUT/player.png"
 fi
 
 # Convert maps
