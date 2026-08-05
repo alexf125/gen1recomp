@@ -1,0 +1,35 @@
+{
+  "fields": [
+    { "name": "base_hp", "count": 1, "type": "int" },
+    { "name": "base_atk", "count": 1, "type": "int" },
+    { "name": "base_def", "count": 1, "type": "int" },
+    { "name": "base_spd", "count": 1, "type": "int" },
+    { "name": "base_spatk", "count": 1, "type": "int" },
+    { "name": "base_spdef", "count": 1, "type": "int" },
+
+    { "name": "type1", "count": 1, "type": "int" },
+    { "name": "type2", "count": 1, "type": "int" },
+
+    { "name": "catch_rate", "count": 1, "type": "int" },
+    { "name": "exp_yield", "count": 1, "type": "int" },
+    { "name": "ev_yield", "count": 1, "type": "int" },
+
+    { "name": "item_common", "count": 1, "type": "int" },
+    { "name": "item_rare", "count": 1, "type": "int" },
+
+    { "name": "gender_ratio", "count": 1, "type": "int" },
+    { "name": "egg_cycles", "count": 1, "type": "int" },
+    { "name": "friendship", "count": 1, "type": "int" },
+
+    { "name": "growth_rate", "count": 1, "type": "int" },
+    { "name": "egg_group_1", "count": 1, "type": "int" },
+    { "name": "egg_group_2", "count": 1, "type": "int" },
+
+    { "name": "abilities", "count": 2, "type": "int" },
+
+    { "name": "safari_flee_rate", "count": 1, "type": "int" },
+    { "name": "color", "count": 1, "type": "int" },
+
+    { "name": "extras", "count": -1, "type": "mixed" }
+  ]
+}

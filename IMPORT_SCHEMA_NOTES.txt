@@ -1,0 +1,8 @@
+Update: Added schema-based species mapper and updated import script to call it.
+
+Files added:
+- tools/species_schema.json (default field ordering for species mapping)
+- tools/map_species_with_schema.py (maps species arrays -> structured JSON using schema)
+- scripts/import-assets.sh.modified (updated import script; rename/move as needed)
+
+Next: I'll replace the active import script or merge the modified script to continue the pipeline. The modified script is provided as scripts/import-assets.sh.modified to avoid overwriting existing script until you confirm.
