@@ -1,4 +1,4 @@
--- love/main.lua (updated: tile-step movement, collision checks, player sprite)
+-- love/main.lua (updated: encounter spawning on move and a simple encounter UI)
 local json = require('json') or require('dkjson')
 local map_renderer = require('map_renderer')
 local species_viewer = require('species_viewer')
@@ -20,6 +20,9 @@ local MAP_OY = 40
 local player = { x = 0, y = 0 }
 local playerSprite = nil
 
+local encounter = nil
+local inEncounter = false
+
 local function load_player_sprite()
   if love.filesystem.getInfo('build/assets/player.png') then
     playerSprite = love.graphics.newImage('build/assets/player.png')
@@ -39,17 +42,42 @@ end
 local function try_move(dx, dy)
   local nx = math.floor(player.x + dx)
   local ny = math.floor(player.y + dy)
-  -- coordinates in map are 0-based in this map; collision uses 0..width-1? map collision uses 0/1 arrays matching width: we stored collision as rows length==width
-  -- Our collision is 0/1 with boundaries 1; convert nx,ny to 1-based indices for collision array
   local cx = nx + 1
   local cy = ny + 1
   if is_blocked(cx, cy) then
-    -- blocked
     return false
   end
   player.x = nx
   player.y = ny
   return true
+end
+
+local function check_for_encounter()
+  if not state.map then return nil end
+  local enc = state.map.encounter_tiles
+  if not enc then return nil end
+  for _,e in ipairs(enc) do
+    if e.x == player.x and e.y == player.y then
+      -- pick first species as demo (or nil)
+      if speciesJson and speciesJson.species and #speciesJson.species > 0 then
+        return speciesJson.species[1]
+      end
+      return { id = 0 }
+    end
+  end
+  return nil
+end
+
+local function start_encounter(spec)
+  encounter = spec
+  inEncounter = true
+  print('Encounter started: species id=' .. tostring(spec.id))
+end
+
+local function end_encounter()
+  encounter = nil
+  inEncounter = false
+  print('Encounter ended')
 end
 
 local function load_map_by_name(name)
@@ -72,6 +100,7 @@ end
 
 function love.load()
   love.window.setTitle('gen1recomp LÖVE MVP — Littleroot Demo')
+  math.randomseed(os.time())
   -- Try to load generated symbols
   if love.filesystem.getInfo('build/symbols.json') then
     local s = love.filesystem.read('build/symbols.json')
@@ -117,7 +146,7 @@ function love.load()
 end
 
 function love.update(dt)
-  -- nothing continuous; movement is tile-step on keypress
+  -- no continuous movement; movement handled on keypress for tile-step
 end
 
 function love.draw()
@@ -148,6 +177,15 @@ function love.draw()
     love.graphics.print('No map/tiles found. Run import-assets.', MAP_OX, MAP_OY)
   end
 
+  if inEncounter and encounter then
+    -- draw a simple encounter panel
+    love.graphics.setColor(0,0,0,0.8)
+    love.graphics.rectangle('fill', 100, 100, 400, 160)
+    love.graphics.setColor(1,1,1)
+    love.graphics.printf('A wild species id='..tostring(encounter.id)..' appeared!', 110, 120, 380)
+    love.graphics.printf('Press ENTER to start battle (demo) or ESC to run', 110, 160, 380)
+  end
+
   love.graphics.setColor(1,1,1)
   love.graphics.print('Controls: Arrow keys to step, B to trigger simple encounter', 10, 520)
 end
@@ -173,6 +211,19 @@ function love.mousepressed(mx, my, button)
 end
 
 function love.keypressed(k)
+  if inEncounter then
+    if k == 'return' or k == 'kpenter' then
+      print('Starting battle (demo) with species id='..tostring(encounter.id))
+      -- placeholder: end encounter immediately
+      end_encounter()
+      return
+    elseif k == 'escape' then
+      print('You ran away (demo)')
+      end_encounter()
+      return
+    end
+  end
+
   if k=='r' then
     -- reload symbols
     if love.filesystem.getInfo('build/symbols.json') then
@@ -214,20 +265,27 @@ function love.keypressed(k)
       load_map_by_name(selectedMapName)
     end
   elseif k == 'b' then
-    -- simple encounter trigger: pick a species and print a battle start message
-    local species = (speciesJson and speciesJson.species and speciesJson.species[1]) or nil
-    if species then
-      print('Encounter! A wild species id='..tostring(species.id)..' appeared (demo).')
-    else
-      print('Encounter! (no species data available)')
-    end
+    local spec = (speciesJson and speciesJson.species and speciesJson.species[1]) or { id = 0 }
+    start_encounter(spec)
   elseif k == 'up' then
-    try_move(0, -1)
+    if try_move(0, -1) then
+      local s = check_for_encounter()
+      if s then start_encounter(s) end
+    end
   elseif k == 'down' then
-    try_move(0, 1)
+    if try_move(0, 1) then
+      local s = check_for_encounter()
+      if s then start_encounter(s) end
+    end
   elseif k == 'left' then
-    try_move(-1, 0)
+    if try_move(-1, 0) then
+      local s = check_for_encounter()
+      if s then start_encounter(s) end
+    end
   elseif k == 'right' then
-    try_move(1, 0)
+    if try_move(1, 0) then
+      local s = check_for_encounter()
+      if s then start_encounter(s) end
+    end
   end
 end
