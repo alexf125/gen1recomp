@@ -30,9 +30,9 @@
     { "x": 11, "y": 9 }
   ],
   "encounter_table": [
-    { "name": "Mudkip", "weight": 1 },
-    { "name": "Treecko", "weight": 1 },
-    { "name": "Torchic", "weight": 1 }
+    { "name": "Mudkip", "weight": 1, "lvl_min": 5, "lvl_max": 7 },
+    { "name": "Treecko", "weight": 1, "lvl_min": 5, "lvl_max": 7 },
+    { "name": "Torchic", "weight": 1, "lvl_min": 5, "lvl_max": 7 }
   ],
   "layers": [
     [
