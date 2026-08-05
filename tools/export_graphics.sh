@@ -1,28 +1,30 @@
 #!/bin/sh
-# tools/export_graphics.sh
-# Export graphics/tiles/palettes/cries using pokeemerald data + existing tools.
-# This script assumes you have the pokeemerald repo checked out (or data path) and
-# tools like grit, gba-image-tools, or other converters available in PATH.
-
+# tools/export_graphics.sh (updated)
 set -euo pipefail
-DATA_DIR=${1:-data}
-OUT_DIR=${2:-exported_assets}
+DATA_DIR=${1:-.}
+OUT_DIR=${2:-build/assets}
 mkdir -p "$OUT_DIR"
 
-echo "Exporting tiles/palettes from $DATA_DIR -> $OUT_DIR"
+# If there are already PNG/TGA in DATA_DIR, copy them; otherwise generate sample tiles
+found=0
+for ext in png tga; do
+  if find "$DATA_DIR" -type f -iname "*.$ext" | grep -q .; then
+    found=1
+    break
+  fi
+done
 
-# Example: find .4bpp tiledata arrays (this is a placeholder step; adapt to your toolchain)
-# Iterate over known files (pokeemerald-specific paths expected)
-# This script should be customized to call actual conversion tools present in your environment.
+if [ "$found" -eq 1 ]; then
+  echo "Copying existing PNG/TGA assets from $DATA_DIR to $OUT_DIR"
+  find "$DATA_DIR" -type f \( -iname '*.png' -o -iname '*.tga' \) -exec cp {} "$OUT_DIR"/ \;
+  exit 0
+fi
 
-# Placeholder: copy any PNG/TGA already present
-find "$DATA_DIR" -type f \( -name '*.png' -o -name '*.tga' \) -exec cp {} "$OUT_DIR"/ \;
-
-# TODO: Add calls to grit/gba-image-utils to convert raw GBA tiles+palettes to PNG/TGA
-# e.g.
-# gba2png --tiles tiles.bin --palette pal.bin -o "$OUT_DIR/tiles.png"
-
-# Audio (cries) placeholder: copy .gba/.bin cries if present
-find "$DATA_DIR" -type f -name '*.gba' -exec cp {} "$OUT_DIR"/ \; || true
-
-echo "Export complete. Customize tools/export_graphics.sh to integrate your preferred converters." 
+# Fallback: generate a sample tileset using Python + Pillow
+if command -v python3 >/dev/null 2>&1; then
+  echo "No existing images found; generating sample tileset into $OUT_DIR"
+  python3 tools/generate_sample_tiles.py "$OUT_DIR"
+else
+  echo "No python3 available to generate sample tiles. Provide converted tiles in $OUT_DIR" >&2
+  exit 1
+fi

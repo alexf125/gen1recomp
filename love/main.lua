@@ -1,55 +1,68 @@
-# Minimal LÖVE app to load JSON assets and draw a tileset
--- love/main.lua
-local json = require 'dkjson' -- optional; the user should install a Lua JSON library or load via love.filesystem
+-- love/main.lua (improved)
+local json = require('json') or require('dkjson')
+local map_renderer = require('map_renderer')
 
 local assets = {}
-local tilesetImg
-local tilesetQuad
+local state = {}
 
 function love.load()
   love.window.setTitle('gen1recomp LÖVE MVP')
-  -- Try to load generated JSON
+  -- Try to load generated symbols
   if love.filesystem.getInfo('build/symbols.json') then
     local s = love.filesystem.read('build/symbols.json')
     local obj = json.decode(s)
     assets = obj.gen1recomp or {}
   else
-    print('build/symbols.json not found; run make import-assets')
+    assets = { symbols = {} }
   end
 
-  -- Try to load an example tileset image
+  -- load map
+  local mapfile = 'build/map.json'
+  local mapf = io.open(mapfile, 'r')
+  if mapf then
+    local mtxt = mapf:read('*a')
+    mapf:close()
+    state.map = json.decode(mtxt)
+  end
+
   if love.filesystem.getInfo('build/assets/tiles.png') then
-    tilesetImg = love.graphics.newImage('build/assets/tiles.png')
+    state.tilesImg = love.graphics.newImage('build/assets/tiles.png')
   end
-end
-
-function love.update(dt)
 end
 
 function love.draw()
-  love.graphics.clear(0.2,0.2,0.25)
+  love.graphics.clear(0.1, 0.1, 0.12)
   love.graphics.setColor(1,1,1)
-  love.graphics.print('Loaded symbols: '..(assets.symbols and #assets.symbols or 0), 10, 10)
-  if tilesetImg then
-    love.graphics.draw(tilesetImg, 10, 40)
+  love.graphics.print('Loaded symbols: '..(#(assets.symbols or {})), 10, 10)
+  if state.map and state.tilesImg then
+    local ok, err = pcall(function() map_renderer.draw(state, 10, 40) end)
+    if not ok then love.graphics.print('Map draw error: '..tostring(err), 10, 40) end
   else
-    love.graphics.print('No tileset image at build/assets/tiles.png', 10, 40)
+    love.graphics.print('No map/tiles found. Run make import-assets.', 10, 40)
   end
 end
 
 function love.keypressed(k)
   if k=='r' then
-    love.filesystem.load('build/symbols.json')
-    -- simple hot-reload: restart lua state by reloading modules / re-reading files
+    -- reload symbols
     if love.filesystem.getInfo('build/symbols.json') then
       local s = love.filesystem.read('build/symbols.json')
       local obj = json.decode(s)
       assets = obj.gen1recomp or {}
       print('Reloaded symbols.json')
     end
+    -- reload tiles
     if love.filesystem.getInfo('build/assets/tiles.png') then
-      tilesetImg = love.graphics.newImage('build/assets/tiles.png')
+      state.tilesImg = love.graphics.newImage('build/assets/tiles.png')
       print('Reloaded tiles.png')
+    end
+    -- reload map
+    local mapf = io.open('build/map.json', 'r')
+    if mapf then
+      local mtxt = mapf:read('*a')
+      mapf:close()
+      state.map = json.decode(mtxt)
+      print('Reloaded map.json')
     end
   end
 end
