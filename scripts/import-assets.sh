@@ -1,5 +1,5 @@
 #!/bin/sh
-# Updated scripts/import-assets.sh to call map_species_fields.py
+# Updated scripts/import-assets.sh to call the graphics/audio converters
 set -euo pipefail
 PE_ROOT=${1:-.}
 BUILD_DIR=build
@@ -9,8 +9,9 @@ SYMBOLS_OUT="$BUILD_DIR/symbols.json"
 SPECIES_OUT="$BUILD_DIR/species.json"
 SPECIES_MAPPED_OUT="$BUILD_DIR/species_mapped.json"
 ASSETS_OUT="$BUILD_DIR/assets"
+CRIES_OUT="$ASSETS_OUT/cries"
 
-mkdir -p "$BUILD_DIR" "$PREP_DIR" "$ASSETS_OUT"
+mkdir -p "$BUILD_DIR" "$PREP_DIR" "$ASSETS_OUT" "$CRIES_OUT"
 
 # Preprocess headers under include/ and src/data/ (if present)
 echo "Preprocessing headers..."
@@ -37,8 +38,18 @@ echo "Mapping species fields to structured JSON..."
 python3 tools/map_species_fields.py --input "$SPECIES_OUT" --output "$SPECIES_MAPPED_OUT"
 
 # Export graphics/audio using pokeemerald data layout
-echo "Exporting graphics/audio..."
-tools/export_graphics.sh "$PE_ROOT" "$ASSETS_OUT"
+echo "Converting graphics..."
+python3 tools/convert_gba_graphics.py --symbols "$SYMBOLS_OUT" --out "$ASSETS_OUT"
+
+echo "Converting cries (placeholders)..."
+python3 tools/convert_cries.py --symbols "$SYMBOLS_OUT" --out "$CRIES_OUT"
+
+# If no tiles were produced by conversion, generate a sample
+echo "Ensuring tiles exist..."
+if [ ! -f "$ASSETS_OUT/tiles.png" ] && [ ! -f "$ASSETS_OUT/tiles_gfx.png" ]; then
+  echo "No converted tiles found -- generating sample tiles"
+  python3 tools/generate_sample_tiles.py "$ASSETS_OUT"
+fi
 
 # Generate a simple sample map JSON that references tiles.json
 MAP_OUT="$BUILD_DIR/map.json"
