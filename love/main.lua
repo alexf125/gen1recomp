@@ -1,4 +1,4 @@
--- love/main.lua (battle integrated, moved into active main)
+-- love/main.lua (updated: pass move and use species base_hp for HP when starting battle)
 local json = require('json') or require('dkjson')
 local map_renderer = require('map_renderer')
 local species_viewer = require('species_viewer')
@@ -233,10 +233,28 @@ function love.keypressed(k)
   if inEncounter then
     if k == 'return' or k == 'kpenter' then
       print('Starting battle (demo) with species id='..tostring(encounter.id))
-      -- start the battle with simple HP values
-      local wild = { id = encounter.id, hp = 40, maxhp = 40 }
-      local ply = { hp = 60, maxhp = 60 }
-      battle.start({ player = ply, wild = wild })
+      -- start the battle using species base HP if available
+      local wild_hp = 40
+      if encounter and encounter.base_hp then
+        wild_hp = tonumber(encounter.base_hp) * 2
+      elseif encounter and encounter.base_hp == nil and encounter.hp then
+        wild_hp = tonumber(encounter.hp)
+      end
+      local ply_hp = 60
+      if speciesJson and speciesJson.species and speciesJson.species[1] and speciesJson.species[1].base_hp then
+        ply_hp = tonumber(speciesJson.species[1].base_hp) * 2
+      end
+      local wild = { id = encounter.id, hp = wild_hp, maxhp = wild_hp }
+      local ply = { hp = ply_hp, maxhp = ply_hp }
+      -- choose a move from movesJson if available
+      local chosen_move = { id = 0, name = 'Tackle', power = 40 }
+      if movesJson and movesJson.moves and #movesJson.moves > 0 then
+        local m = movesJson.moves[1]
+        chosen_move.id = m.id or chosen_move.id
+        chosen_move.name = m.name or chosen_move.name
+        chosen_move.power = m.power or m.raw and (m.raw[3] or chosen_move.power) or chosen_move.power
+      end
+      battle.start({ player = ply, wild = wild, move = chosen_move })
       return
     elseif k == 'escape' then
       print('You ran away (demo)')

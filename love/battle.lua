@@ -5,14 +5,18 @@ local M = {}
 local state = {
   active = false,
   player = nil,
-  wild = nil
+  wild = nil,
+  move = nil,
+  log = {}
 }
 
 function M.start(opts)
   state.active = true
   state.player = opts.player or {hp=100, maxhp=100, name='PlayerMon'}
   state.wild = opts.wild or {id=0, hp=50, maxhp=50}
+  state.move = opts.move or {id=0, name='Tackle', power=40}
   state.log = {}
+  table.insert(state.log, 'Battle started (demo)')
 end
 
 function M.update(dt)
@@ -32,6 +36,7 @@ function M.draw()
   -- wild
   love.graphics.print('Wild ID: '..tostring(state.wild.id), 70, 150)
   love.graphics.print('Wild HP: '..tostring(state.wild.hp)..'/'..tostring(state.wild.maxhp), 70, 170)
+  love.graphics.print('Move: '..tostring(state.move.name)..' (power '..tostring(state.move.power)..')', 70, 190)
   love.graphics.print('Press SPACE to attack (demo), ESC to end battle', 70, 220)
   -- log
   for i=1, math.min(#state.log, 6) do
@@ -39,19 +44,34 @@ function M.draw()
   end
 end
 
+local function compute_damage(attacker, defender, move)
+  -- Simple demo damage formula using move power and attack/def stats if present
+  local base_power = (move and move.power) and tonumber(move.power) or 40
+  local atk = (attacker and (attacker.atk or attacker.base_atk or attacker.attack)) or 10
+  local def = (defender and (defender.def or defender.base_def or defender.defense)) or 8
+  atk = tonumber(atk) or 10
+  def = tonumber(def) or 8
+  -- very simplified: dmg = power * (atk/def) * random factor
+  local ratio = math.max(0.5, atk / math.max(1, def))
+  local dmg = math.floor(base_power * ratio / 10) + math.random(1,3)
+  if dmg < 1 then dmg = 1 end
+  return dmg
+end
+
 function M.handle_key(k)
   if not state.active then return end
   if k == 'space' then
-    -- player attacks: simple damage 10-20
-    local dmg = math.random(10,20)
+    -- player attacks using selected move
+    local dmg = compute_damage(state.player, state.wild, state.move)
     state.wild.hp = math.max(0, state.wild.hp - dmg)
     table.insert(state.log, 'Player hit wild for '..dmg..' damage')
     if state.wild.hp == 0 then
       table.insert(state.log, 'Wild fainted!')
       state.active = false
     else
-      -- wild counterattack
-      local wdmg = math.random(5,12)
+      -- wild counterattack (simple auto-attack)
+      local wild_move = { power = 20 }
+      local wdmg = compute_damage(state.wild, state.player, wild_move)
       state.player.hp = math.max(0, state.player.hp - wdmg)
       table.insert(state.log, 'Wild hit player for '..wdmg..' damage')
       if state.player.hp == 0 then
