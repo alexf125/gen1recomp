@@ -1,0 +1,11 @@
+# Makefile additions
+.PHONY: import-assets
+import-assets:
+	@echo "Running import-assets pipeline..."
+	./scripts/import-assets.sh $(PWD)
+	@echo "Done. Assets in build/"
+
+.PHONY: love-run
+love-run:
+	@echo "Run the LÖVE app (requires love installed)."
+	@echo "From repo root run: love love"

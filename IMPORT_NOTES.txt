@@ -1,0 +1,12 @@
+README: Added import pipeline and LÖVE MVP scaffolding.
+
+Files added:
+- tools/preprocess_headers.sh
+- tools/extract_symbols.py
+- tools/export_graphics.sh
+- scripts/import-assets.sh
+- love/main.lua
+- love/conf.lua
+- Makefile.additions
+
+These are scaffolding files to implement the requested pipeline. Customize export_graphics.sh to call your preferred converters (grit/gba-image-tools, m4a tools, etc.). The Python extractor is deliberately small and expects preprocessed input (use tools/preprocess_headers.sh). The Makefile.additions file should be merged into your main Makefile (or replace accordingly).
