@@ -1,5 +1,6 @@
 #!/bin/sh
-# Updated scripts/import-assets.sh to call the graphics/audio converters
+# Updated import pipeline: preprocess headers, extract symbols, parse species using schema,
+# convert graphics/cries, convert maps. Overwrites previous import script.
 set -euo pipefail
 PE_ROOT=${1:-.}
 BUILD_DIR=build
@@ -13,7 +14,7 @@ CRIES_OUT="$ASSETS_OUT/cries"
 
 mkdir -p "$BUILD_DIR" "$PREP_DIR" "$ASSETS_OUT" "$CRIES_OUT"
 
-# Preprocess headers under include/ and src/data/ (if present)
+# Preprocess headers under include/ and src/data/
 echo "Preprocessing headers..."
 if [ -d "$PE_ROOT/include" ]; then
   find "$PE_ROOT/include" -type f -name '*.h' -print0 | xargs -0 -n1 -I{} sh -c 'tools/preprocess_headers.sh "{}" > "$PREP_DIR/$(basename {}).i"'
@@ -33,9 +34,15 @@ python3 tools/extract_symbols.py --inputs "$PREP_ALL" --output "$SYMBOLS_OUT"
 echo "Parsing species table..."
 python3 tools/parse_species.py --input "$SYMBOLS_OUT" --output "$SPECIES_OUT"
 
-# Map species fields to structured schema
-echo "Mapping species fields to structured JSON..."
-python3 tools/map_species_fields.py --input "$SPECIES_OUT" --output "$SPECIES_MAPPED_OUT"
+# Map species fields using schema
+SCHEMA=tools/species_schema.json
+if [ -f "$SCHEMA" ]; then
+  echo "Mapping species fields using schema $SCHEMA"
+  python3 tools/map_species_with_schema.py --input "$SPECIES_OUT" --schema "$SCHEMA" --output "$SPECIES_MAPPED_OUT"
+else
+  echo "Schema $SCHEMA not found; falling back to previous mapper"
+  python3 tools/map_species_fields.py --input "$SPECIES_OUT" --output "$SPECIES_MAPPED_OUT"
+fi
 
 # Export graphics/audio using pokeemerald data layout
 echo "Converting graphics..."
@@ -45,45 +52,51 @@ echo "Converting cries (placeholders)..."
 python3 tools/convert_cries.py --symbols "$SYMBOLS_OUT" --out "$CRIES_OUT"
 
 # If no tiles were produced by conversion, generate a sample
-echo "Ensuring tiles exist..."
-if [ ! -f "$ASSETS_OUT/tiles.png" ] && [ ! -f "$ASSETS_OUT/tiles_gfx.png" ]; then
+if [ ! -f "$ASSETS_OUT/tiles.png" ]; then
   echo "No converted tiles found -- generating sample tiles"
   python3 tools/generate_sample_tiles.py "$ASSETS_OUT"
 fi
 
-# Generate a simple sample map JSON that references tiles.json
+# Convert maps
+python3 tools/convert_maps.py --symbols "$SYMBOLS_OUT" --out "$BUILD_DIR/maps" --tiles "$ASSETS_OUT/tiles_meta.json"
+
+# If convert_maps did not produce maps, ensure a fallback sample map exists at build/map.json
 MAP_OUT="$BUILD_DIR/map.json"
-cat > "$MAP_OUT" <<EOF
+if [ ! -d "$BUILD_DIR/maps" ] || [ -z "$(ls -A $BUILD_DIR/maps 2>/dev/null || true)" ]; then
+  echo "No maps found in build/maps; creating sample map at $MAP_OUT"
+  cat > "$MAP_OUT" <<EOF
 {
   "width": 16,
   "height": 12,
   "tileset": "assets/tiles.png",
-  "tile_width": 16,
-  "tile_height": 16,
+  "tile_width": 8,
+  "tile_height": 8,
   "layers": [
     [
 EOF
-# generate a simple checker pattern
-for y in $(seq 0 11); do
-  echo -n "[" >> "$MAP_OUT"
-  for x in $(seq 0 15); do
-    idx=$(( (x + y) % 64 ))
-    if [ $x -lt 15 ]; then
-      echo -n "$idx, " >> "$MAP_OUT"
+  for y in $(seq 0 11); do
+    echo -n "[" >> "$MAP_OUT"
+    for x in $(seq 0 15); do
+      idx=$(( (x + y) % 64 ))
+      if [ $x -lt 15 ]; then
+        echo -n "$idx, " >> "$MAP_OUT"
+      else
+        echo -n "$idx" >> "$MAP_OUT"
+      fi
+    done
+    if [ $y -lt 11 ]; then
+      echo "]," >> "$MAP_OUT"
     else
-      echo -n "$idx" >> "$MAP_OUT"
+      echo "]" >> "$MAP_OUT"
     fi
   done
-  if [ $y -lt 11 ]; then
-    echo "]," >> "$MAP_OUT"
-  else
-    echo "]" >> "$MAP_OUT"
-  fi
-done
-cat >> "$MAP_OUT" <<EOF
+  cat >> "$MAP_OUT" <<EOF
     ]
   ]
 }
 EOF
+else
+  echo "Maps found in build/maps/; using those for preview."
+fi
 
-echo "Import pipeline finished. Outputs: $SYMBOLS_OUT, $SPECIES_OUT, $SPECIES_MAPPED_OUT, $ASSETS_OUT, $MAP_OUT"
+echo "Import pipeline finished. Outputs: $SYMBOLS_OUT, $SPECIES_OUT, $SPECIES_MAPPED_OUT, $ASSETS_OUT, $BUILD_DIR/maps"
