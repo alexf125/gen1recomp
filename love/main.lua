@@ -1,4 +1,4 @@
--- love/main.lua (updated to load species.json viewer)
+-- love/main.lua (updated to use tiles_meta.json when available)
 local json = require('json') or require('dkjson')
 local map_renderer = require('map_renderer')
 local species_viewer = require('species_viewer')
@@ -6,6 +6,7 @@ local species_viewer = require('species_viewer')
 local assets = {}
 local state = {}
 local speciesJson = nil
+local tiles_meta = nil
 
 function love.load()
   love.window.setTitle('gen1recomp LÖVE MVP')
@@ -19,9 +20,18 @@ function love.load()
   end
 
   -- load species
-  if love.filesystem.getInfo('build/species.json') then
+  if love.filesystem.getInfo('build/species_mapped.json') then
+    local s = love.filesystem.read('build/species_mapped.json')
+    speciesJson = json.decode(s)
+  elseif love.filesystem.getInfo('build/species.json') then
     local s = love.filesystem.read('build/species.json')
     speciesJson = json.decode(s)
+  end
+
+  -- load tiles meta if present
+  if love.filesystem.getInfo('build/assets/tiles_meta.json') then
+    local s = love.filesystem.read('build/assets/tiles_meta.json')
+    tiles_meta = json.decode(s)
   end
 
   -- load map
@@ -44,7 +54,7 @@ function love.draw()
   love.graphics.print('Loaded symbols: '..(#(assets.symbols or {})), 10, 10)
   species_viewer.draw(speciesJson, 300, 10)
   if state.map and state.tilesImg then
-    local ok, err = pcall(function() map_renderer.draw(state, 10, 40) end)
+    local ok, err = pcall(function() map_renderer.draw(state, 10, 40, tiles_meta) end)
     if not ok then love.graphics.print('Map draw error: '..tostring(err), 10, 40) end
   else
     love.graphics.print('No map/tiles found. Run make import-assets.', 10, 40)
@@ -61,7 +71,11 @@ function love.keypressed(k)
       print('Reloaded symbols.json')
     end
     -- reload species
-    if love.filesystem.getInfo('build/species.json') then
+    if love.filesystem.getInfo('build/species_mapped.json') then
+      local s = love.filesystem.read('build/species_mapped.json')
+      speciesJson = json.decode(s)
+      print('Reloaded species_mapped.json')
+    elseif love.filesystem.getInfo('build/species.json') then
       local s = love.filesystem.read('build/species.json')
       speciesJson = json.decode(s)
       print('Reloaded species.json')
@@ -70,6 +84,11 @@ function love.keypressed(k)
     if love.filesystem.getInfo('build/assets/tiles.png') then
       state.tilesImg = love.graphics.newImage('build/assets/tiles.png')
       print('Reloaded tiles.png')
+    end
+    if love.filesystem.getInfo('build/assets/tiles_meta.json') then
+      local s = love.filesystem.read('build/assets/tiles_meta.json')
+      tiles_meta = json.decode(s)
+      print('Reloaded tiles_meta.json')
     end
     -- reload map
     local mapf = io.open('build/map.json', 'r')
